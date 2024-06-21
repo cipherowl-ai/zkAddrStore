@@ -1,4 +1,11 @@
-# This is a project demosntrating using bloom filter to store lage number of private blockchain address
+# ZkAddressStore
+
+## what does it do?
+This project showcases using a Bloom filter to share sets of addresses while preserving privacy.
+
+The data structure is saved in a `.gob` file. For a set of 1 million Ethereum addresses, the resulting file is 30MB without compression. When compressed using gzip, it shrinks to around 13MB.
+
+This .gob file can be easily shared across the data pipeline, and with the help of key pair, confidentiality can be achieved as well.
 
 ## Step 1
 
@@ -12,12 +19,12 @@ go run evmaddress_generator/main.go -n 1000000
 
 ## Step 2
 
-Build the bloom filter
+Build a bloom filter
 
 ```bash
-# use the content in address.txt to build the bloom filter, 1 entry per line, and stored in bloomfilter.gob
+# use the content in address.txt to build the bloom filter, one entry per line, and the result is stored in a .gob file.
 go run encoder/main.go
-ls -alh bloomfilter.gob
+ls -al bloomfilter.gob
 ```
 
 ## Step 3
