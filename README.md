@@ -43,4 +43,34 @@ Enter string: xxxx
 Definitely not in set.
 Enter string: 0x7e531DE4a901a88b2540a6973797d6AAA75F2fdF
 
+
+## another example
+Building a bloom filter with 24M Ethereum addresses, and check if the address is in the set.
+
+```bash
+> head -n 5 ~/Downloads/eth_all.csv
+address
+0x17a5f41c5b2d869cf7eb4d3727a975a6231a0e5a
+0xa0a6b8f5f8d41b88a4306c6a9e85028cbefad8e1
+0xbd4649c52778bb9259d5cd38e97a936eab57a194
+0x0df259a1d46dd4262c55904a96bb6a0ea4dd9c3c
+> wc -l ~/Downloads/eth_all.csv
+ 24972961 /Users/leozc/Downloads/eth_all.csv
+
+> go run encoder/main.go -n 1000000000 -p 0.000001 -input ~/Downloads/eth_all.csv # took 20 seconds
+Bloom filter has been serialized successfully.
+
+> go run checker/main.go
+Enter strings to check. Type 'exit' to quit.
+Enter string: 0x0df259a1d46dd4262c55904a96bb6a0ea4dd9c3c
+Possibly in set.
+Enter string: address
+Possibly in set.
+Enter string: bc1qzzx06uwamj2sk2393r6x8p395g95mdny6f369j
+Definitely not in set.
+Enter string:
+
+> ls -alh *.gob
+-rw-r--r--  1 leozc  staff   3.3G Jul  2 15:13 bloomfilter.gob
+
 ```
