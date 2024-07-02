@@ -42,7 +42,7 @@ Possibly in set.
 Enter string: xxxx
 Definitely not in set.
 Enter string: 0x7e531DE4a901a88b2540a6973797d6AAA75F2fdF
-
+```
 
 ## another example
 Building a bloom filter with 24M Ethereum addresses, and check if the address is in the set.
