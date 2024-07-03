@@ -34,7 +34,7 @@ Bloom filter has been serialized successfully.
 
 ```bash
 # load bloomfilter.gob, and start a shell to check if the address is in the bloom filter
-> go run checker/main.go
+> go run checker/main.go -f bloomfilter.gob
 
 Enter strings to check. Type 'exit' to quit.
 Enter string: 0x6864A451C800D21B9c5673A8153E3aD47cEBc94d
@@ -60,7 +60,7 @@ address
 > go run encoder/main.go -n 1000000000 -p 0.000001 -input ~/Downloads/eth_all.csv # took 20 seconds
 Bloom filter has been serialized successfully.
 
-> go run checker/main.go
+> go run checker/main.go -f bloomfilter.gob
 Enter strings to check. Type 'exit' to quit.
 Enter string: 0x0df259a1d46dd4262c55904a96bb6a0ea4dd9c3c
 Possibly in set.
