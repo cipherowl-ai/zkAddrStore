@@ -81,6 +81,17 @@ In this example, the resulting `bloomfilter.gob` file is about 3.3GB.
 - Encoding 24M addresses takes approximately 20 seconds on a standard machine.
 - The Bloom filter provides constant-time complexity for both adding and checking addresses.
 
+### Fun metrics
+
+```bash
+➜ time target/debug/pa-encoder -input ~/Downloads/eth_all.csv
+Bloom filter has been serialized successfully.
+target/debug/pa-encoder -input ~/Downloads/eth_all.csv  13.59s user 0.33s system 97% cpu 14.211 total
+➜ time target/release/pa-encoder -input ~/Downloads/eth_all.csv
+Bloom filter has been serialized successfully.
+target/release/pa-encoder -input ~/Downloads/eth_all.csv  4.32s user 0.26s system 94% cpu 4.835 total
+```
+
 ## Limitations
 
 - Bloom filters have a false-positive rate but no false negatives.
@@ -95,7 +106,3 @@ In this example, the resulting `bloomfilter.gob` file is about 3.3GB.
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-[Specify your license here]
