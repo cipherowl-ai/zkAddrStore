@@ -1,76 +1,101 @@
 # ZkAddressStore
 
-## what does it do?
-This project showcases using a Bloom filter to share sets of addresses while preserving privacy.
+## Overview
 
-The data structure is saved in a `.gob` file. For a set of 1 million Ethereum addresses, the resulting file is 3.5MB without compression. The actual result depends on the number of addresses and the false positive rate you choose.
+ZkAddressStore is a project that demonstrates the use of Bloom filters to share sets of blockchain addresses while preserving privacy. It provides tools for generating Ethereum addresses, encoding them into a Bloom filter, and checking addresses against the filter.
 
-This .gob file can be easily shared across the data pipeline, and with the help of key pair, confidentiality can be achieved as well.
+## Key Features
 
-## Step 1
+- Generate large sets of Ethereum addresses
+- Encode addresses into a space-efficient Bloom filter
+- Check if an address is potentially in the set
+- Preserve privacy while sharing address sets
 
-Generate 1M EVM addresses
+## How It Works
 
-```bash
-# generate 1M EVM addresses, resume is stored in address.txt
-> go run evmaddress_generator/main.go -n 1000000
-Generated 1000000 Ethereum addresses
-```
+The project uses a Bloom filter, which is saved in a `.gob` file. This data structure allows for efficient storage and querying of large sets of data with a controllable false-positive rate.
 
-## Step 2
+For example, a set of 1 million Ethereum addresses results in a `.gob` file of approximately 3.5MB (uncompressed). The actual size depends on the number of addresses and the chosen false-positive rate.
 
-Build a bloom filter
+The `.gob` file can be easily shared across data pipelines. With the addition of key-pair encryption (not implemented in this version), confidentiality can be further enhanced.
 
-```bash
-# use the content in address.txt to build the bloom filter, one entry per line, and the result is stored in a .gob file. 
-# -n is the number of entries, -p is the false positive rate
-> go run encoder/main.go -n 1000000 -p 0.000001
-Bloom filter has been serialized successfully.
-> ls -alh bloomfilter.gob
--rw-r--r--  1 leozc  staff   3.4M Jun 20 22:48 bloomfilter.gob
-```
-
-## Step 3
+## Installation
 
 ```bash
-# load bloomfilter.gob, and start a shell to check if the address is in the bloom filter
-> go run checker/main.go -f bloomfilter.gob
-
-Enter strings to check. Type 'exit' to quit.
-Enter string: 0x6864A451C800D21B9c5673A8153E3aD47cEBc94d
-Possibly in set.
-Enter string: xxxx
-Definitely not in set.
-Enter string: 0x7e531DE4a901a88b2540a6973797d6AAA75F2fdF
+git clone https://github.com/your-username/ZkAddressStore.git
+cd ZkAddressStore
+go mod tidy
 ```
 
-## another example
-Building a bloom filter with 24M Ethereum addresses, and check if the address is in the set.
+## Usage
+
+### Step 1: Generate Ethereum Addresses
+
+Generate a set of Ethereum addresses:
 
 ```bash
-> head -n 5 ~/Downloads/eth_all.csv
-address
-0x17a5f41c5b2d869cf7eb4d3727a975a6231a0e5a
-0xa0a6b8f5f8d41b88a4306c6a9e85028cbefad8e1
-0xbd4649c52778bb9259d5cd38e97a936eab57a194
-0x0df259a1d46dd4262c55904a96bb6a0ea4dd9c3c
-> wc -l ~/Downloads/eth_all.csv
- 24972961 /Users/leozc/Downloads/eth_all.csv
-
-> go run encoder/main.go -n 1000000000 -p 0.000001 -input ~/Downloads/eth_all.csv # took 20 seconds
-Bloom filter has been serialized successfully.
-
-> go run checker/main.go -f bloomfilter.gob
-Enter strings to check. Type 'exit' to quit.
-Enter string: 0x0df259a1d46dd4262c55904a96bb6a0ea4dd9c3c
-Possibly in set.
-Enter string: address
-Possibly in set.
-Enter string: bc1qzzx06uwamj2sk2393r6x8p395g95mdny6f369j
-Definitely not in set.
-Enter string:
-
-> ls -alh *.gob
--rw-r--r--  1 leozc  staff   3.3G Jul  2 15:13 bloomfilter.gob
-
+go run evmaddress_generator/main.go -n 1000000
 ```
+
+This generates 1 million Ethereum addresses and stores them in `address.txt`.
+
+### Step 2: Build the Bloom Filter
+
+Create a Bloom filter from the generated addresses:
+
+```bash
+go run encoder/main.go -n 1000000 -p 0.000001
+```
+
+- `-n`: Number of entries (should match the number of generated addresses)
+- `-p`: False positive rate
+
+This creates a `bloomfilter.gob` file containing the Bloom filter.
+
+### Step 3: Check Addresses
+
+Use the checker to verify if addresses are in the set:
+
+```bash
+go run checker/main.go -f bloomfilter.gob
+```
+
+This starts an interactive shell where you can enter addresses to check against the Bloom filter.
+
+## Example: Large-Scale Usage
+
+Here's an example of building a Bloom filter with 24 million Ethereum addresses:
+
+```bash
+# Assuming you have a file 'eth_all.csv' with 24M addresses, and the max number of addresses is 1000000000
+go run encoder/main.go -n 1000000000 -p 0.000001 -input ~/path/to/eth_all.csv
+
+# Check addresses
+go run checker/main.go -f bloomfilter.gob
+```
+
+In this example, the resulting `bloomfilter.gob` file is about 3.3GB.
+
+## Performance
+
+- Encoding 24M addresses takes approximately 20 seconds on a standard machine.
+- The Bloom filter provides constant-time complexity for both adding and checking addresses.
+
+## Limitations
+
+- Bloom filters have a false-positive rate but no false negatives.
+- The current implementation does not include encryption for the `.gob` file.
+
+## Future Improvements
+
+- Implement encryption for the `.gob` file to enhance security.
+- Optimize the Bloom filter parameters for different use cases.
+- Add a web interface for easier interaction with the Bloom filter.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+[Specify your license here]
