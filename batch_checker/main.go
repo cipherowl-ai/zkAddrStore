@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/bits-and-blooms/bloom/v3"
 )
@@ -26,6 +27,8 @@ func main() {
 	}
 	defer file.Close()
 
+	// measure the time it takes to load the bloom filter
+	start := time.Now()
 	// Decode the Bloom filter
 	var filter *bloom.BloomFilter
 	decoder := gob.NewDecoder(file)
@@ -33,6 +36,8 @@ func main() {
 		fmt.Println("Error decoding bloom filter:", err)
 		return
 	}
+	elapsed := time.Since(start)
+	fmt.Printf("> Time taken to load bloomfilter: %v\n", elapsed)
 
 	// Create a scanner to read input from standard input
 	scanner := bufio.NewScanner(os.Stdin)
