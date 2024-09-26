@@ -29,7 +29,7 @@ go mod tidy
 
 ## Usage
 
-### Step 1: Generate Ethereum Addresses
+### Step 1: Optional - Generate Ethereum Addresses
 
 Generate a set of Ethereum addresses:
 
@@ -39,7 +39,7 @@ go run evmaddress_generator/main.go -n 1000000
 
 This generates 1 million Ethereum addresses and stores them in `address.txt`.
 
-### Step 2: Build the Bloom Filter
+### Step 2: Build the Bloom Filter with the input address file
 
 Create a Bloom filter from the generated addresses:
 
@@ -58,6 +58,12 @@ Use the checker to verify if addresses are in the set:
 
 ```bash
 go run checker/main.go -f bloomfilter.gob
+```
+
+Or check the addresses in a batch way:
+
+```bash
+cat my_addresses.txt | go run batch_checker/main.go -f bloomfilter.gob
 ```
 
 This starts an interactive shell where you can enter addresses to check against the Bloom filter.

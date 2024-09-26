@@ -55,6 +55,6 @@ func main() {
 	}
 
 	if err := scanner.Err(); err != nil && err != io.EOF {
-		fmt.Printf("Error reading from standard input: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error reading from standard input: %v\n", err)
 	}
 }

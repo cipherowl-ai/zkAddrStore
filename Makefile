@@ -11,7 +11,17 @@ DEBUG_FLAGS=-gcflags="all=-N -l"
 RELEASE_FLAGS=-ldflags="-s -w" -trimpath
 
 # Build targets
-all: clean build-release
+all: fmt clean build-debug build-release
+
+
+# format
+fmt:
+	$(GOCMD) fmt checker/main.go 
+	$(GOCMD) fmt encoder/main.go 
+	$(GOCMD) fmt batch_checker/main.go 
+	$(GOCMD) fmt evmaddress_generator/main.go 
+	$(GOCMD) fmt server/main.go 
+
 
 build-debug: prepare
 	$(GOBUILD) $(DEBUG_FLAGS) -o $(TARGET_DIR)/debug/$(BINARY_NAME)-checker ./checker
