@@ -44,6 +44,8 @@ func main() {
 
 	// read from standard input, till EOF, and check if the string is in the bloom filter
 
+	// measure the time it takes to check the bloom filter
+	start = time.Now()
 	for {
 		if !scanner.Scan() {
 			if scanner.Err() != nil {
@@ -58,6 +60,8 @@ func main() {
 			fmt.Println("NOT in set:", input)
 		}
 	}
+	elapsed = time.Since(start)
+	fmt.Printf("> Time taken to check bloomfilter: %v\n", elapsed)
 
 	if err := scanner.Err(); err != nil && err != io.EOF {
 		fmt.Fprintf(os.Stderr, "Error reading from standard input: %v\n", err)
