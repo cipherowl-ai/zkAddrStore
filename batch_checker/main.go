@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/bits-and-blooms/bloom/v3"
 )
@@ -26,6 +27,8 @@ func main() {
 	}
 	defer file.Close()
 
+	// measure the time it takes to load the bloom filter
+	start := time.Now()
 	// Decode the Bloom filter
 	var filter *bloom.BloomFilter
 	decoder := gob.NewDecoder(file)
@@ -33,12 +36,16 @@ func main() {
 		fmt.Println("Error decoding bloom filter:", err)
 		return
 	}
+	elapsed := time.Since(start)
+	fmt.Printf("> Time taken to load bloomfilter: %v\n", elapsed)
 
 	// Create a scanner to read input from standard input
 	scanner := bufio.NewScanner(os.Stdin)
 
 	// read from standard input, till EOF, and check if the string is in the bloom filter
 
+	// measure the time it takes to check the bloom filter
+	start = time.Now()
 	for {
 		if !scanner.Scan() {
 			if scanner.Err() != nil {
@@ -53,8 +60,10 @@ func main() {
 			fmt.Println("NOT in set:", input)
 		}
 	}
+	elapsed = time.Since(start)
+	fmt.Printf("> Time taken to check bloomfilter: %v\n", elapsed)
 
 	if err := scanner.Err(); err != nil && err != io.EOF {
-		fmt.Printf("Error reading from standard input: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error reading from standard input: %v\n", err)
 	}
 }
