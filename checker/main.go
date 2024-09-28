@@ -19,7 +19,7 @@ func main() {
 	filter, err := lib.BloomFilterFromFile(*filename)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
-		return
+		os.Exit(-1)
 	}
 
 	// Create a scanner to read input from standard input

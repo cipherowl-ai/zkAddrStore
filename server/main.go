@@ -1,25 +1,34 @@
 package main
 
+/**
+Example server for the Bloom filter, should be good enough as OOB solution
+
+
+*/
 import (
+	"addressdb/lib"
 	"context"
-	"encoding/gob"
 	"encoding/json"
-	"fmt"
+	"flag"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
+	"strconv"
+
 	"github.com/bits-and-blooms/bloom/v3"
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
 	"golang.org/x/time/rate"
 )
 
 var (
-	filter *bloom.BloomFilter
-	logger = log.New(os.Stdout, "BloomServer: ", log.LstdFlags)
+	filter    *bloom.BloomFilter
+	logger    = log.New(os.Stdout, "BloomServer: ", log.LstdFlags)
+	lasterror error
+	ratelimit int
+	burst     int
 )
 
 type Response struct {
@@ -29,30 +38,30 @@ type Response struct {
 }
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		logger.Println("No .env file found")
-	}
+	filename := flag.String("f", "bloomfilter.gob", "Path to the .gob file containing the Bloom filter")
+	port := flag.Int("p", 8080, "Port to listen on")
+	ratelimit_v := flag.Int("r", 20, "Ratelimit")
+	burst_v := flag.Int("b", 5, "Burst")
+	flag.Parse()
 
-	filename := os.Getenv("BLOOM_FILTER_FILE")
-	if filename == "" {
-		filename = "bloomfilter.gob"
-	}
+	// Use the values
+	ratelimit = *ratelimit_v
+	burst = *burst_v
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	filter, lasterror = lib.BloomFilterFromFile(*filename)
 
-	if err := loadBloomFilter(filename); err != nil {
-		logger.Fatalf("Failed to load Bloom filter: %v", err)
+	if lasterror != nil {
+		logger.Fatalf("Failed to load Bloom filter: %v", lasterror)
+		os.Exit(-1)
 	}
 
 	r := mux.NewRouter()
 	r.Use(loggingMiddleware)
 	r.Handle("/check", rateLimitMiddleware(http.HandlerFunc(checkHandler))).Methods("GET")
+	r.Handle("/checkBatch", rateLimitMiddleware(http.HandlerFunc(checkBatchHandler))).Methods("POST")
 
 	srv := &http.Server{
-		Addr:         ":" + port,
+		Addr:         ":" + strconv.Itoa(*port),
 		Handler:      r,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -68,22 +77,6 @@ func main() {
 
 	gracefulShutdown(srv)
 }
-
-func loadBloomFilter(filename string) error {
-	file, err := os.Open(filename)
-	if err != nil {
-		return fmt.Errorf("error opening file %s: %v", filename, err)
-	}
-	defer file.Close()
-
-	decoder := gob.NewDecoder(file)
-	if err := decoder.Decode(&filter); err != nil {
-		return fmt.Errorf("error decoding bloom filter: %v", err)
-	}
-
-	return nil
-}
-
 func checkHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("s")
 	if query == "" {
@@ -91,14 +84,62 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inSet := filter.TestString(query)
-	response := Response{
-		Query: query,
-		InSet: inSet,
-		Message: fmt.Sprintf("The string '%s' is %s in the set.",
-			query, map[bool]string{true: "possibly", false: "definitely not"}[inSet]),
+	found := filter.TestString(query)
+	response := struct {
+		Found bool `json:"found"`
+	}{
+		Found: found,
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func checkBatchHandler(w http.ResponseWriter, r *http.Request) {
+	// Read the request body
+	var requestBody struct {
+		Addresses []string `json:"addresses"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&requestBody)
+	if err != nil {
+		http.Error(w, `{"error": "Invalid JSON body"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Check if the addresses list is empty
+	if len(requestBody.Addresses) == 0 {
+		http.Error(w, `{"error": "Empty addresses list"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Check each address against the Bloom filter
+	found := make([]string, 0)
+	notFound := make([]string, 0)
+
+	for _, address := range requestBody.Addresses {
+		if filter.TestString(address) {
+			found = append(found, address)
+		} else {
+			notFound = append(notFound, address)
+		}
+	}
+
+	var resultsMerged struct {
+		Found         []string `json:"found"`
+		NotFound      []string `json:"notfound"`
+		FoundCount    int      `json:"found_count"`
+		NotFoundCount int      `json:"notfound_count"`
+	}
+
+	resultsMerged.Found = found
+	resultsMerged.NotFound = notFound
+	resultsMerged.FoundCount = len(found)
+	resultsMerged.NotFoundCount = len(notFound)
+
+	// Prepare the response
+	response := resultsMerged
+	// Send the response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -118,7 +159,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func rateLimitMiddleware(next http.Handler) http.Handler {
-	limiter := rate.NewLimiter(2, 5)
+	limiter := rate.NewLimiter(rate.Limit(ratelimit), burst)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !limiter.Allow() {
 			http.Error(w, "Too many requests", http.StatusTooManyRequests)

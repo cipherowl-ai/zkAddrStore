@@ -1,5 +1,9 @@
 # ZkAddressStore
 
+## Status Of The Project
+
+The project is currently in the beta phrase, it will contain breaking changes in the future.
+
 ## Overview
 
 ZkAddressStore demonstrates the use of Bloom filters to share sets of blockchain addresses while preserving privacy. It provides tools for generating Ethereum addresses, encoding them into a Bloom filter, and checking addresses against the filter.
@@ -51,11 +55,13 @@ Creates a `bloomfilter.gob` file containing the Bloom filter.
 ### Step 3: Use the Filter
 
 Interactive mode:
+
 ```bash
 go run checker/main.go -f bloomfilter.gob
 ```
 
 Batch mode:
+
 ```bash
 cat my_addresses.txt | go run batch_checker/main.go -f bloomfilter.gob
 ```
