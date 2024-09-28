@@ -30,10 +30,10 @@ func main() {
 	// Create a scanner to read input from standard input
 	scanner := bufio.NewScanner(os.Stdin)
 
-	// read from standard input, till EOF, and check if the string is in the bloom filter
-
 	// measure the time it takes to check the bloom filter
 	start = time.Now()
+
+	// read from standard input, till EOF, and check if the string is in the bloom filter
 	for {
 		if !scanner.Scan() {
 			if scanner.Err() != nil {
@@ -43,8 +43,8 @@ func main() {
 			break
 		}
 		input := scanner.Text()
-		if filter.TestString(input) {
-		} else {
+		// only handle non-existing entries
+		if !filter.TestString(input) {
 			fmt.Println("NOT in set:", input)
 		}
 	}
