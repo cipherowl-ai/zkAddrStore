@@ -1,15 +1,13 @@
 package main
 
 import (
+	"addressdb/lib"
 	"bufio"
-	"encoding/gob"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"time"
-
-	"github.com/bits-and-blooms/bloom/v3"
 )
 
 func main() {
@@ -19,21 +17,11 @@ func main() {
 	// Parse the command-line flags
 	flag.Parse()
 
-	// Open the serialized Bloom filter file
-	file, err := os.Open(*filename)
-	if err != nil {
-		fmt.Printf("Error opening file %s: %v\n", *filename, err)
-		return
-	}
-	defer file.Close()
-
-	// measure the time it takes to load the bloom filter
 	start := time.Now()
-	// Decode the Bloom filter
-	var filter *bloom.BloomFilter
-	decoder := gob.NewDecoder(file)
-	if err := decoder.Decode(&filter); err != nil {
-		fmt.Println("Error decoding bloom filter:", err)
+	// Open the serialized Bloom filter file
+	filter, err := lib.BloomFilterFromFile(*filename)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
 		return
 	}
 	elapsed := time.Since(start)
