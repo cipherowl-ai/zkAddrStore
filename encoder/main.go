@@ -38,21 +38,23 @@ func main() {
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Println("Error reading from file:", err)
-		return
+		os.Exit(-1)
+
 	}
 
 	// Serialize the Bloom filter to a file
 	f, err := os.Create(*outputFile)
 	if err != nil {
 		fmt.Println("Error creating output file:", err)
-		return
+		os.Exit(-1)
+
 	}
 	defer f.Close()
 
 	encoder := gob.NewEncoder(f)
 	if err := encoder.Encode(filter); err != nil {
 		fmt.Println("Error encoding bloom filter:", err)
-		return
+		os.Exit(-1)
 	}
 
 	fmt.Println("Bloom filter has been serialized successfully.")

@@ -1,15 +1,13 @@
 package main
 
 import (
+	"addressdb/lib"
 	"bufio"
-	"encoding/gob"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"time"
-
-	"github.com/bits-and-blooms/bloom/v3"
 )
 
 func main() {
@@ -19,22 +17,13 @@ func main() {
 	// Parse the command-line flags
 	flag.Parse()
 
-	// Open the serialized Bloom filter file
-	file, err := os.Open(*filename)
-	if err != nil {
-		fmt.Printf("Error opening file %s: %v\n", *filename, err)
-		return
-	}
-	defer file.Close()
-
-	// measure the time it takes to load the bloom filter
 	start := time.Now()
-	// Decode the Bloom filter
-	var filter *bloom.BloomFilter
-	decoder := gob.NewDecoder(file)
-	if err := decoder.Decode(&filter); err != nil {
-		fmt.Println("Error decoding bloom filter:", err)
-		return
+	// Open the serialized Bloom filter file
+	filter, err := lib.BloomFilterFromFile(*filename)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		os.Exit(-1)
+
 	}
 	elapsed := time.Since(start)
 	fmt.Printf("> Time taken to load bloomfilter: %v\n", elapsed)
@@ -42,10 +31,10 @@ func main() {
 	// Create a scanner to read input from standard input
 	scanner := bufio.NewScanner(os.Stdin)
 
-	// read from standard input, till EOF, and check if the string is in the bloom filter
-
 	// measure the time it takes to check the bloom filter
 	start = time.Now()
+
+	// read from standard input, till EOF, and check if the string is in the bloom filter
 	for {
 		if !scanner.Scan() {
 			if scanner.Err() != nil {
@@ -55,8 +44,8 @@ func main() {
 			break
 		}
 		input := scanner.Text()
-		if filter.TestString(input) {
-		} else {
+		// only handle non-existing entries
+		if !filter.TestString(input) {
 			fmt.Println("NOT in set:", input)
 		}
 	}
