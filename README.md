@@ -36,7 +36,7 @@ go mod tidy
 ### Step 1: Generate Ethereum Addresses (Optional)
 
 ```bash
-go run evmaddress_generator/main.go -n 1000000
+go run cmd/cli/main.go generate-addresses -n 1000000
 ```
 
 Generates 1 million Ethereum addresses and stores them in `address.txt`.
@@ -44,7 +44,7 @@ Generates 1 million Ethereum addresses and stores them in `address.txt`.
 ### Step 2: Build the Bloom Filter
 
 ```bash
-go run encoder/main.go -n 1000000 -p 0.000001
+go run cmd/cli/main.go encode -n 1000000 -p 0.000001
 ```
 
 - `-n`: Number of entries (should match the number of generated addresses)
@@ -57,13 +57,13 @@ Creates a `bloomfilter.gob` file containing the Bloom filter.
 Interactive mode:
 
 ```bash
-go run checker/main.go -f bloomfilter.gob
+go run cmd/cli/main.go check -f bloomfilter.gob
 ```
 
 Batch mode:
 
 ```bash
-cat my_addresses.txt | go run batch_checker/main.go -f bloomfilter.gob
+cat my_addresses.txt | go run cmd/cli/main.go batch-check -f bloomfilter.gob
 ```
 
 ## Large-Scale Example
@@ -71,10 +71,10 @@ cat my_addresses.txt | go run batch_checker/main.go -f bloomfilter.gob
 Building a Bloom filter with 24 million Ethereum addresses:
 
 ```bash
-go run encoder/main.go -n 1000000000 -p 0.000001 -input ~/path/to/eth_all.csv
+go run cmd/cli/main.go encode -n 1000000000 -p 0.000001 -input ~/path/to/eth_all.csv
 
 # Check addresses
-go run checker/main.go -f bloomfilter.gob
+go run cmd/cli/main.go check -f bloomfilter.gob
 ```
 
 Result: `bloomfilter.gob` file of about 3.3GB.
@@ -88,11 +88,11 @@ Result: `bloomfilter.gob` file of about 3.3GB.
 
 ```bash
 # Debug build
-time target/debug/pa-encoder -input ~/Downloads/eth_all.csv
+time target/debug/pa-cli check -input ~/Downloads/eth_all.csv
 # 13.59s user 0.33s system 97% cpu 14.211 total
 
 # Release build
-time target/release/pa-encoder -input ~/Downloads/eth_all.csv
+time target/release/pa-cli encode -input ~/Downloads/eth_all.csv
 # 4.32s user 0.26s system 94% cpu 4.835 total
 ```
 
@@ -104,10 +104,23 @@ time target/release/pa-encoder -input ~/Downloads/eth_all.csv
 #### Small-scale performance
 
 ```bash
-go run encoder/main.go -n 100000 -p 0.0000001
+go run cmd/cli/main.go encode -n 100000 -p 0.0000001
 ```
 
 Results in a ~450KB filter.
+
+#### Micro-benchmarks
+
+```bash
+go test -bench=. -benchmemstore % go test -bench=. -test.benchmem        
+goos: darwin
+goarch: arm64
+pkg: addressdb/store
+BenchmarkAddAddress-16                  11823907               103.5 ns/op            48 B/op          1 allocs/op
+BenchmarkBloomFilterTestNaive-16         5685646               212.2 ns/op            95 B/op          1 allocs/op
+BenchmarkCheckAddress-16                14392717                82.72 ns/op           48 B/op          1 allocs/op
+BenchmarkBloomFilterNaiveCheck-16        5969546               214.6 ns/op            95 B/op          1 allocs/op
+```
 
 ## Limitations
 

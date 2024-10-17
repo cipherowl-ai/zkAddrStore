@@ -6,7 +6,8 @@ Example server for the Bloom filter, should be good enough as OOB solution
 
 */
 import (
-	"addressdb/lib"
+	"addressdb/address"
+	"addressdb/store"
 	"context"
 	"encoding/json"
 	"flag"
@@ -18,13 +19,12 @@ import (
 
 	"strconv"
 
-	"github.com/bits-and-blooms/bloom/v3"
 	"github.com/gorilla/mux"
 	"golang.org/x/time/rate"
 )
 
 var (
-	filter    *bloom.BloomFilter
+	filter    *store.BloomFilterStore
 	logger    = log.New(os.Stdout, "BloomServer: ", log.LstdFlags)
 	lasterror error
 	ratelimit int
@@ -47,12 +47,11 @@ func main() {
 	// Use the values
 	ratelimit = *ratelimit_v
 	burst = *burst_v
-
-	filter, lasterror = lib.BloomFilterFromFile(*filename)
+	addressHandler := &address.EVMAddressHandler{}
+	filter, lasterror = store.NewBloomFilterStoreFromFile(*filename, addressHandler)
 
 	if lasterror != nil {
 		logger.Fatalf("Failed to load Bloom filter: %v", lasterror)
-		os.Exit(-1)
 	}
 
 	r := mux.NewRouter()
@@ -84,7 +83,12 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	found := filter.TestString(query)
+	found, err := filter.CheckAddress(query)
+	if err != nil {
+		http.Error(w, `{"error": "Internal server error"}`, http.StatusBadRequest)
+		return
+	}
+
 	response := struct {
 		Found bool `json:"found"`
 	}{
@@ -118,7 +122,7 @@ func checkBatchHandler(w http.ResponseWriter, r *http.Request) {
 	notFound := make([]string, 0)
 
 	for _, address := range requestBody.Addresses {
-		if filter.TestString(address) {
+		if ok, err := filter.CheckAddress(address); ok && err == nil {
 			found = append(found, address)
 		} else {
 			notFound = append(notFound, address)
