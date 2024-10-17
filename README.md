@@ -109,6 +109,19 @@ go run encoder/main.go -n 100000 -p 0.0000001
 
 Results in a ~450KB filter.
 
+#### Micro-benchmarks
+
+```bash
+go test -bench=. -benchmemstore % go test -bench=. -test.benchmem        
+goos: darwin
+goarch: arm64
+pkg: addressdb/store
+BenchmarkAddAddress-16                  11823907               103.5 ns/op            48 B/op          1 allocs/op
+BenchmarkBloomFilterTestNaive-16         5685646               212.2 ns/op            95 B/op          1 allocs/op
+BenchmarkCheckAddress-16                14392717                82.72 ns/op           48 B/op          1 allocs/op
+BenchmarkBloomFilterNaiveCheck-16        5969546               214.6 ns/op            95 B/op          1 allocs/op
+```
+
 ## Limitations
 
 - False-positive rate, but no false negatives

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"addressdb/lib"
+	"addressdb/store"
 	"bufio"
 	"flag"
 	"fmt"
@@ -16,7 +16,7 @@ func main() {
 	// Parse the command-line flags
 	flag.Parse()
 
-	filter, err := lib.BloomFilterFromFile(*filename)
+	filter, err := store.BloomFilterFromFile(*filename)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		os.Exit(-1)

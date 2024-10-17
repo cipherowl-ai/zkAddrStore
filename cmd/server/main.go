@@ -6,7 +6,7 @@ Example server for the Bloom filter, should be good enough as OOB solution
 
 */
 import (
-	"addressdb/lib"
+	"addressdb/store"
 	"context"
 	"encoding/json"
 	"flag"
@@ -48,7 +48,7 @@ func main() {
 	ratelimit = *ratelimit_v
 	burst = *burst_v
 
-	filter, lasterror = lib.BloomFilterFromFile(*filename)
+	filter, lasterror = store.BloomFilterFromFile(*filename)
 
 	if lasterror != nil {
 		logger.Fatalf("Failed to load Bloom filter: %v", lasterror)

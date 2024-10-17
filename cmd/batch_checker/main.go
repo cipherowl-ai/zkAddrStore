@@ -1,7 +1,6 @@
 package main
 
 import (
-	"addressdb/lib"
 	"bufio"
 	"flag"
 	"fmt"
@@ -19,7 +18,7 @@ func main() {
 
 	start := time.Now()
 	// Open the serialized Bloom filter file
-	filter, err := lib.BloomFilterFromFile(*filename)
+	filter, err := pkg.BloomFilterFromFile(*filename)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		os.Exit(-1)

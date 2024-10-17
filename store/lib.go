@@ -1,4 +1,4 @@
-package lib
+package store
 
 import (
 	"encoding/gob"
