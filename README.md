@@ -31,7 +31,57 @@ cd ZkAddressStore
 go mod tidy
 ```
 
-## Usage
+## Library Usage
+
+Create a new Bloom filter store and add addresses to it:
+```go
+// Create an EVM address handler that will be used to validate and encode addresses
+addressHandler := &address.EVMAddressHandler{}
+
+// Create a new BloomFilterStore to store 100 addresses with a false positive rate of 0.1
+store, _ := NewBloomFilterStore(100, 0.1, addressHandler)
+
+store.AddAddress("0x1234567890123456789012345678901234567890")
+
+if ok, _ := store.CheckAddress("0x1234567890123456789012345678901234567890"); ok {
+    fmt.Println("Address found in the Bloom filter")
+} else {
+    fmt.Println("Address not found in the Bloom filter")
+}
+
+store.SaveToFile(filePath)
+```
+
+Or load the bloom filter from a file:
+```go
+// Create a new BloomFilterStore and load from the file
+store, _ := NewBloomFilterStoreFromFile(filePath, addressHandler)
+
+if ok, _ := store.CheckAddress("0x1234567890123456789012345678901234567890"); ok {
+    fmt.Println("Address found in the Bloom filter")
+} else {
+    fmt.Println("Address not found in the Bloom filter")
+}
+```
+
+### Auto-reloading from file when the file changes
+```go
+
+// Create a file watcher notifier, that will reload the Bloom filter when the file changes.  
+// But never more than once every 2 seconds.
+addressHandler := &address.EVMAddressHandler{}
+store, _ := NewBloomFilterStoreFromFile(filePath, addressHandler)
+notifier, _ := reload.NewFileWatcherNotifier(filePath, 2*time.Second)
+
+// Create the ReloadManager with the notifier.
+manager := reload.NewReloadManager(filter, notifier)
+manager.Start(context.Background())
+defer manager.Stop()
+
+```
+
+
+## CLI Usage
 
 ### Step 1: Generate Ethereum Addresses (Optional)
 
