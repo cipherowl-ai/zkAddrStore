@@ -7,6 +7,7 @@ Example server for the Bloom filter, should be good enough as OOB solution
 */
 import (
 	"addressdb/address"
+	"addressdb/reload"
 	"addressdb/store"
 	"context"
 	"encoding/json"
@@ -53,6 +54,19 @@ func main() {
 	if lasterror != nil {
 		logger.Fatalf("Failed to load Bloom filter: %v", lasterror)
 	}
+
+	// Create a file watcher notifier.
+	notifier, err := reload.NewFileWatcherNotifier(*filename, 2*time.Second)
+	if err != nil {
+		log.Fatalf("Error creating file watcher notifier: %v", err)
+	}
+
+	// Create the ReloadManager with the notifier.
+	manager := reload.NewReloadManager(filter, notifier)
+	if err := manager.Start(context.Background()); err != nil {
+		log.Fatalf("Error starting Bloom filter manager: %v", err)
+	}
+	defer manager.Stop()
 
 	r := mux.NewRouter()
 	r.Use(loggingMiddleware)
