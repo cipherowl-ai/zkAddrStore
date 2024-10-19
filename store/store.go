@@ -106,7 +106,6 @@ func (bf *BloomFilterStore) CheckAddress(address string) (bool, error) {
 	return bf.filter.Test(addressBytes), nil
 }
 
-// LoadFromFile loads the Bloom filter from the specified file and decrypts it.
 func (bf *BloomFilterStore) LoadFromFile(filePath string) error {
 	if filePath == "" {
 		return fmt.Errorf("no file path specified for loading")
@@ -114,32 +113,31 @@ func (bf *BloomFilterStore) LoadFromFile(filePath string) error {
 
 	f, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %v", err)
+		return fmt.Errorf("failed to open file: %w", err)
 	}
+	defer f.Close()
 
 	var filter bloom.BloomFilter
 	if bf.secureDataHandler != nil {
 		r, err := bf.secureDataHandler.Reader(f)
 		if err != nil {
-			return fmt.Errorf("failed to decrypt file: %v", err)
+			return fmt.Errorf("failed to decrypt file: %w", err)
 		}
 		if _, err := filter.ReadFrom(r); err != nil {
-			return fmt.Errorf("failed to read Bloom filter: %v", err)
+			return fmt.Errorf("failed to read Bloom filter: %w", err)
 		}
-
 		if err := r.VerifySignature(); err != nil {
-			return fmt.Errorf("failed to verify signature: %v", err)
+			return fmt.Errorf("failed to verify signature: %w", err)
 		}
 	} else {
 		r := bufio.NewReader(f)
 		if _, err := filter.ReadFrom(r); err != nil {
-			return fmt.Errorf("failed to read Bloom filter: %v", err)
+			return fmt.Errorf("failed to read Bloom filter: %w", err)
 		}
 	}
 
 	bf.mu.Lock()
 	defer bf.mu.Unlock()
-
 	bf.filter = &filter
 
 	return nil
