@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/bits-and-blooms/bloom/v3"
-	"io"
 	"os"
 	"sync"
 )
@@ -118,18 +117,24 @@ func (bf *BloomFilterStore) LoadFromFile(filePath string) error {
 		return fmt.Errorf("failed to open file: %v", err)
 	}
 
-	var reader io.Reader = bufio.NewReader(f)
+	var filter bloom.BloomFilter
 	if bf.secureDataHandler != nil {
-		//TODO: does the secureDataHandler benefit from the reader?
-		reader, err = bf.secureDataHandler.Reader(reader)
+		r, err := bf.secureDataHandler.Reader(f)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt file: %v", err)
 		}
-	}
+		if _, err := filter.ReadFrom(r); err != nil {
+			return fmt.Errorf("failed to read Bloom filter: %v", err)
+		}
 
-	var filter bloom.BloomFilter
-	if _, err := filter.ReadFrom(reader); err != nil {
-		return fmt.Errorf("failed to read Bloom filter: %v", err)
+		if err := r.VerifySignature(); err != nil {
+			return fmt.Errorf("failed to verify signature: %v", err)
+		}
+	} else {
+		r := bufio.NewReader(f)
+		if _, err := filter.ReadFrom(r); err != nil {
+			return fmt.Errorf("failed to read Bloom filter: %v", err)
+		}
 	}
 
 	bf.mu.Lock()

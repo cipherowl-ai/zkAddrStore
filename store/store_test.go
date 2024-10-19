@@ -3,7 +3,6 @@ package store
 import (
 	"addressdb/address"
 	"addressdb/securedata"
-	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -13,21 +12,34 @@ import (
 func TestBloomFilterStoreFunctional(t *testing.T) {
 	addressHandler := &address.EVMAddressHandler{}
 
-	aliceKeyPriv, aliceKeyPub, bobKeyPriv, bobKeyPub := generateTestKeys(t)
-	aliceHandler, err := securedata.NewPGPSecureHandler(securedata.WithPrivateKey(aliceKeyPriv), securedata.WithPublicKey(bobKeyPub))
-	require.NoError(t, err, "Failed to create Alice's secure data handler")
+	keys := securedata.GenerateTestKeys(t)
+	aliceKeyPriv, aliceKeyPub := keys[0], keys[1]
+	bobKeyPriv, bobKeyPub := keys[2], keys[3]
+	chadKeyPriv := keys[4]
 
-	bobHandler, err := securedata.NewPGPSecureHandler(securedata.WithPrivateKey(bobKeyPriv), securedata.WithPublicKey(aliceKeyPub))
-	require.NoError(t, err, "Failed to create Bob's secure data handler")
+	aliceWriter, err := securedata.NewPGPSecureHandler(securedata.WithPrivateKey(aliceKeyPriv), securedata.WithPublicKey(bobKeyPub))
+	require.NoError(t, err, "Failed to create Alice's writer")
+
+	bobReader, err := securedata.NewPGPSecureHandler(securedata.WithPrivateKey(bobKeyPriv), securedata.WithPublicKey(aliceKeyPub))
+	require.NoError(t, err, "Failed to create Bob's reader")
+
+	chadReader, err := securedata.NewPGPSecureHandler(securedata.WithPrivateKey(chadKeyPriv), securedata.WithPublicKey(aliceKeyPub))
+	require.NoError(t, err, "Failed to create Chad's reader")
+
+	chadWriter, err := securedata.NewPGPSecureHandler(securedata.WithPrivateKey(chadKeyPriv), securedata.WithPublicKey(bobKeyPub))
+	require.NoError(t, err, "Failed to create Chad's writer")
 
 	tests := []struct {
 		name        string
 		writer_opts []Option
 		reader_opts []Option
+		wantReadErr bool
 	}{
-		{"default", nil, nil},
-		{"WithEstimates", []Option{WithEstimates(100, 0.0000001)}, nil},
-		{"WithEncryption", []Option{WithSecureDataHandler(aliceHandler)}, []Option{WithSecureDataHandler(bobHandler)}},
+		{name: "default"},
+		{name: "WithEstimates", writer_opts: []Option{WithEstimates(100, 0.0000001)}},
+		{name: "WithEncryption", writer_opts: []Option{WithSecureDataHandler(aliceWriter)}, reader_opts: []Option{WithSecureDataHandler(bobReader)}},
+		{name: "chad unauthorized access", writer_opts: []Option{WithSecureDataHandler(aliceWriter)}, reader_opts: []Option{WithSecureDataHandler(chadReader)}, wantReadErr: true},
+		{name: "chad impersonate alice", writer_opts: []Option{WithSecureDataHandler(chadWriter)}, reader_opts: []Option{WithSecureDataHandler(bobReader)}, wantReadErr: true},
 	}
 
 	for _, tt := range tests {
@@ -42,6 +54,10 @@ func TestBloomFilterStoreFunctional(t *testing.T) {
 			defer os.Remove(filePath)
 
 			bfReloaded, err2 := NewBloomFilterStoreFromFile(filePath, addressHandler, tt.reader_opts...)
+			if tt.wantReadErr {
+				require.Error(t, err2, "Expected error when reading Bloom filter")
+				return
+			}
 			require.NoError(t, err2, "Failed to load Bloom filter from file")
 			checkAddressesInBloomFilter(t, bfReloaded, addresses)
 		})
@@ -79,25 +95,4 @@ func checkAddressesInBloomFilter(t *testing.T, bf *BloomFilterStore, addresses [
 func createAddress() string {
 	key, _ := crypto.GenerateKey()
 	return crypto.PubkeyToAddress(key.PublicKey).Hex()
-}
-
-func generateTestKeys(t *testing.T) (*pgp.Key, *pgp.Key, *pgp.Key, *pgp.Key) {
-	pgp := pgp.PGP()
-	aliceKeyPriv, err := pgp.KeyGeneration().
-		AddUserId("alice", "alice@alice.com").
-		New().
-		GenerateKey()
-	require.NoError(t, err)
-	aliceKeyPub, err := aliceKeyPriv.ToPublic()
-	require.NoError(t, err)
-
-	bobKeyPriv, err := pgp.KeyGeneration().
-		AddUserId("bob", "bob@bob.com").
-		New().
-		GenerateKey()
-	require.NoError(t, err)
-	bobKeyPub, err := bobKeyPriv.ToPublic()
-	require.NoError(t, err)
-
-	return aliceKeyPriv, aliceKeyPub, bobKeyPriv, bobKeyPub
 }

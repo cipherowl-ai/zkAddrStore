@@ -3,45 +3,17 @@ package securedata
 import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"testing"
 
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
-	"github.com/stretchr/testify/require"
 )
 
-func generateTestKeys(t *testing.T) (*crypto.Key, *crypto.Key, *crypto.Key, *crypto.Key, *crypto.Key, *crypto.Key) {
-	pgp := crypto.PGP()
-	aliceKeyPriv, err := pgp.KeyGeneration().
-		AddUserId("alice", "alice@alice.com").
-		New().
-		GenerateKey()
-	require.NoError(t, err)
-	aliceKeyPub, err := aliceKeyPriv.ToPublic()
-	require.NoError(t, err)
-
-	bobKeyPriv, err := pgp.KeyGeneration().
-		AddUserId("bob", "bob@bob.com").
-		New().
-		GenerateKey()
-	require.NoError(t, err)
-	bobKeyPub, err := bobKeyPriv.ToPublic()
-	require.NoError(t, err)
-
-	chadKeyPriv, err := pgp.KeyGeneration().
-		AddUserId("chad", "chad@chad.com").
-		New().
-		GenerateKey()
-	require.NoError(t, err)
-	chadKeyPub, err := chadKeyPriv.ToPublic()
-	require.NoError(t, err)
-
-	return aliceKeyPriv, aliceKeyPub, bobKeyPriv, bobKeyPub, chadKeyPriv, chadKeyPub
-}
-
 func TestNewPGPSecureHandler(t *testing.T) {
-	privKey, _, pubKey, _, _, _ := generateTestKeys(t)
+	keys := GenerateTestKeys(t)
+	privKey, pubKey := keys[0], keys[1]
 	handler, err := NewPGPSecureHandler(WithPrivateKey(privKey), WithPublicKey(pubKey))
 	require.NoError(t, err)
 	require.NotNil(t, handler)
@@ -51,19 +23,12 @@ func TestNewPGPSecureHandler(t *testing.T) {
 }
 
 func TestWithPublicKeyPath(t *testing.T) {
-	_, pubKey, _, _, _, _ := generateTestKeys(t)
+	keys := GenerateTestKeys(t)
+	pubKey := keys[1]
 
-	// Save the public key to a temporary file
-	pubKeyData, err := pubKey.Armor()
-	require.NoError(t, err)
-	tmpFile, err := os.CreateTemp("", "pubkey_*.asc")
-	require.NoError(t, err)
+	tmpFile := createTempFile(t, pubKey)
 	defer os.Remove(tmpFile.Name())
-	_, err = tmpFile.Write([]byte(pubKeyData))
-	require.NoError(t, err)
-	require.NoError(t, tmpFile.Close())
 
-	// Create OpenPGPSecureHandler using WithPublicKeyPath option
 	handler, err := NewPGPSecureHandler(WithPublicKeyPath(tmpFile.Name()))
 	require.NoError(t, err)
 	require.NotNil(t, handler)
@@ -74,35 +39,22 @@ func TestGpgKeys(t *testing.T) {
 	pubkeyPath := "testdata/pubkey.asc"
 	privkeyPath := "testdata/privkey.asc"
 
-	// Create OpenPGPSecureHandler using WithPublicKeyPath option
 	handler, err := NewPGPSecureHandler(WithPublicKeyPath(pubkeyPath), WithPrivateKeyPath(privkeyPath, "password123"))
 	require.NoError(t, err)
 	require.NotNil(t, handler)
 
-	require.NoError(t, err)
-	require.NotNil(t, handler)
-
 	var buf bytes.Buffer
-	writer, err := handler.Writer(&buf)
-	require.NoError(t, err)
+	writer := createWriter(t, handler, &buf)
+	writeData(t, writer, "test data")
 
-	_, err = writer.Write([]byte("test data"))
-	require.NoError(t, err)
-	require.NoError(t, writer.Close())
-
-	require.NoError(t, err)
-	require.NotNil(t, handler)
-
-	reader, err := handler.Reader(&buf)
-	require.NoError(t, err)
-
-	decryptedData, err := io.ReadAll(reader)
-	require.NoError(t, err)
+	reader := createReader(t, handler, &buf)
+	decryptedData := readData(t, reader)
 	require.Equal(t, "test data", string(decryptedData))
 }
 
 func TestWithPrivateKeyPath(t *testing.T) {
-	privKey, _, _, _, _, _ := generateTestKeys(t)
+	keys := GenerateTestKeys(t)
+	privKey := keys[0]
 	tests := []struct {
 		name       string
 		privateKey *crypto.Key
@@ -114,54 +66,37 @@ func TestWithPrivateKeyPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var privKey *crypto.Key = tt.privateKey
-			var err error
-			if tt.passphrase != "" {
-				pgp := crypto.PGP()
-				privKey, err = pgp.LockKey(tt.privateKey, []byte(tt.passphrase))
-				require.NoError(t, err)
-			}
-
-			// Save the private key to a temporary file
-			privKeyData, err := privKey.Armor()
-			require.NoError(t, err)
-			tmpFile, err := os.CreateTemp("", "privkey_*.asc")
-			require.NoError(t, err)
+			privKey := lockKeyIfNeeded(t, tt.privateKey, tt.passphrase)
+			tmpFile := createTempFile(t, privKey)
 			defer os.Remove(tmpFile.Name())
 
-			_, err = tmpFile.Write([]byte(privKeyData))
-			require.NoError(t, err)
-			require.NoError(t, tmpFile.Close())
-
-			// Create OpenPGPSecureHandler using WithPrivateKeyPath option
 			handler, err := NewPGPSecureHandler(WithPrivateKeyPath(tmpFile.Name(), tt.passphrase))
 			require.NoError(t, err)
 			require.NotNil(t, handler)
 			assert.Equal(t, privKey.GetFingerprint(), handler.privKey.GetFingerprint())
 		})
-
 	}
 }
 
 func TestPGPSecureHandler_Writer(t *testing.T) {
-	privKey, _, pubKey, _, _, _ := generateTestKeys(t)
+	keys := GenerateTestKeys(t)
+	privKey, pubKey := keys[0], keys[1]
 	handler, err := NewPGPSecureHandler(WithPrivateKey(privKey), WithPublicKey(pubKey))
 	require.NoError(t, err)
 	require.NotNil(t, handler)
 
 	var buf bytes.Buffer
-	writer, err := handler.Writer(&buf)
-	require.NoError(t, err)
-
-	_, err = writer.Write([]byte("test data"))
-	require.NoError(t, err)
-	require.NoError(t, writer.Close())
+	writer := createWriter(t, handler, &buf)
+	writeData(t, writer, "test data")
 
 	require.NotEmpty(t, buf.Bytes())
 }
 
 func TestPGPSecureHandler_Reader(t *testing.T) {
-	aliceKeyPriv, aliceKeyPub, bobKeyPriv, bobKeyPub, chadKeyPriv, _ := generateTestKeys(t)
+	keys := GenerateTestKeys(t)
+	aliceKeyPriv, aliceKeyPub := keys[0], keys[1]
+	bobKeyPriv, bobKeyPub := keys[2], keys[3]
+	chadKeyPriv := keys[4]
 	tests := []struct {
 		name           string
 		senderPrivKey  *crypto.Key
@@ -178,22 +113,12 @@ func TestPGPSecureHandler_Reader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sendHandler, err := NewPGPSecureHandler(WithPrivateKey(tt.senderPrivKey), WithPublicKey(tt.receiverPubKey))
-			require.NoError(t, err)
-			require.NotNil(t, sendHandler)
-
+			sendHandler := createHandler(t, tt.senderPrivKey, tt.receiverPubKey)
 			var buf bytes.Buffer
-			writer, err := sendHandler.Writer(&buf)
-			require.NoError(t, err)
+			writer := createWriter(t, sendHandler, &buf)
+			writeData(t, writer, "test data")
 
-			_, err = writer.Write([]byte("test data"))
-			require.NoError(t, err)
-			require.NoError(t, writer.Close())
-
-			readHandler, err := NewPGPSecureHandler(WithPrivateKey(tt.readerPrivKey), WithPublicKey(tt.readerPubKey))
-			require.NoError(t, err)
-			require.NotNil(t, readHandler)
-
+			readHandler := createHandler(t, tt.readerPrivKey, tt.readerPubKey)
 			reader, err := readHandler.Reader(&buf)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -210,4 +135,56 @@ func TestPGPSecureHandler_Reader(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createTempFile(t *testing.T, key *crypto.Key) *os.File {
+	keyData, err := key.Armor()
+	require.NoError(t, err)
+	tmpFile, err := os.CreateTemp("", "*.asc")
+	require.NoError(t, err)
+	_, err = tmpFile.Write([]byte(keyData))
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+	return tmpFile
+}
+
+func lockKeyIfNeeded(t *testing.T, key *crypto.Key, passphrase string) *crypto.Key {
+	if passphrase == "" {
+		return key
+	}
+	pgp := crypto.PGP()
+	lockedKey, err := pgp.LockKey(key, []byte(passphrase))
+	require.NoError(t, err)
+	return lockedKey
+}
+
+func createHandler(t *testing.T, privKey, pubKey *crypto.Key) *OpenPGPSecureHandler {
+	handler, err := NewPGPSecureHandler(WithPrivateKey(privKey), WithPublicKey(pubKey))
+	require.NoError(t, err)
+	require.NotNil(t, handler)
+	return handler
+}
+
+func createWriter(t *testing.T, handler *OpenPGPSecureHandler, buf *bytes.Buffer) io.WriteCloser {
+	writer, err := handler.Writer(buf)
+	require.NoError(t, err)
+	return writer
+}
+
+func writeData(t *testing.T, writer io.WriteCloser, data string) {
+	_, err := writer.Write([]byte(data))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+}
+
+func createReader(t *testing.T, handler *OpenPGPSecureHandler, buf *bytes.Buffer) io.Reader {
+	reader, err := handler.Reader(buf)
+	require.NoError(t, err)
+	return reader
+}
+
+func readData(t *testing.T, reader io.Reader) []byte {
+	data, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	return data
 }

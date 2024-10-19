@@ -94,7 +94,7 @@ func (h *OpenPGPSecureHandler) Writer(output io.Writer) (io.WriteCloser, error) 
 }
 
 // Reader returns an io.Reader that decrypts data and verifies the signature.
-func (h *OpenPGPSecureHandler) Reader(input io.Reader) (io.Reader, error) {
+func (h *OpenPGPSecureHandler) Reader(input io.Reader) (VerifyDataReader, error) {
 	decHandle, err := h.pgpHandle.Decryption().
 		DecryptionKey(h.privKey).
 		VerificationKey(h.pubKey).
@@ -108,23 +108,33 @@ func (h *OpenPGPSecureHandler) Reader(input io.Reader) (io.Reader, error) {
 		return nil, err
 	}
 
-	return &VerifiedReader{VerifyDataReader: ptReader}, nil
+	return &VerifiedReader{reader: ptReader}, nil
 }
 
 // VerifiedReader wraps VerifyDataReader and verifies the signature at the end.
 type VerifiedReader struct {
-	*crypto.VerifyDataReader
+	reader *crypto.VerifyDataReader
 }
 
 // Read reads data from the underlying VerifyDataReader and verifies the signature at the end.
 func (r *VerifiedReader) Read(b []byte) (int, error) {
-	n, err := r.VerifyDataReader.Read(b)
+	n, err := r.reader.Read(b)
 	if errors.Is(err, io.EOF) {
-		if result, verifyErr := r.VerifySignature(); verifyErr != nil {
+		if result, verifyErr := r.reader.VerifySignature(); verifyErr != nil {
 			return n, verifyErr
 		} else if result.SignatureError() != nil {
 			return n, result.SignatureError()
 		}
 	}
 	return n, err
+}
+
+func (r *VerifiedReader) VerifySignature() error {
+	if result, err := r.reader.ReadAllAndVerifySignature(); err != nil {
+		return err
+	} else if result.SignatureError() != nil {
+		return result.SignatureError()
+	}
+
+	return nil
 }
