@@ -2,8 +2,8 @@ package store
 
 import (
 	"addressdb/address"
+	"addressdb/securedata"
 	"bufio"
-	"errors"
 	"fmt"
 	"github.com/bits-and-blooms/bloom/v3"
 	"os"
@@ -11,31 +11,52 @@ import (
 )
 
 type BloomFilterStore struct {
-	filter         *bloom.BloomFilter
-	addressHandler address.AddressHandler
-	mu             sync.RWMutex // Mutex to handle concurrent reloads.
+	filter            *bloom.BloomFilter
+	addressHandler    address.AddressHandler
+	secureDataHandler securedata.SecureDataHandler
+	mu                sync.RWMutex // Mutex to handle concurrent reloads.
 }
 
-// NewBloomFilterStore creates a new Bloom filter with file monitoring capabilities.
-func NewBloomFilterStore(capacity uint, falsePositiveRate float64, addressHandler address.AddressHandler) (*BloomFilterStore, error) {
-	if falsePositiveRate <= 0 || falsePositiveRate >= 1 {
-		return nil, errors.New("invalid false positive rate: must be between 0 and 1")
+// Option defines a functional option for BloomFilterStore.
+type Option func(*BloomFilterStore)
+
+// WithCapacity sets the capacity for the Bloom filter.
+func WithEstimates(capacity uint, falsePositiveRate float64) Option {
+	return func(bf *BloomFilterStore) {
+		bf.filter = bloom.NewWithEstimates(capacity, falsePositiveRate)
+	}
+}
+
+// WithSecureDataHandler sets the SecureDataHandler for the Bloom filter.
+func WithSecureDataHandler(handler securedata.SecureDataHandler) Option {
+	return func(bf *BloomFilterStore) {
+		bf.secureDataHandler = handler // Assuming you have a field for SecureDataHandler in BloomFilterStore
+	}
+}
+
+// NewBloomFilterStore creates a new Bloom filter with optional file monitoring capabilities.
+func NewBloomFilterStore(addressHandler address.AddressHandler, opts ...Option) (*BloomFilterStore, error) {
+	bf := &BloomFilterStore{
+		addressHandler: addressHandler,
+		filter:         bloom.NewWithEstimates(10000, 0.0000001), // Default values
 	}
 
-	filter := bloom.NewWithEstimates(capacity, falsePositiveRate)
-
-	bf := &BloomFilterStore{
-		filter:         filter,
-		addressHandler: addressHandler,
+	for _, opt := range opts {
+		opt(bf)
 	}
 
 	return bf, nil
 }
 
 // NewBloomFilterStoreFromFile creates a new Bloom filter from a file.
-func NewBloomFilterStoreFromFile(filePath string, addressHandler address.AddressHandler) (*BloomFilterStore, error) {
+func NewBloomFilterStoreFromFile(filePath string, addressHandler address.AddressHandler, opts ...Option) (*BloomFilterStore, error) {
 	bf := &BloomFilterStore{
 		addressHandler: addressHandler,
+		filter:         bloom.NewWithEstimates(0, 0.1), // Default values
+	}
+
+	for _, opt := range opts {
+		opt(bf)
 	}
 
 	if err := bf.LoadFromFile(filePath); err != nil {
@@ -85,7 +106,6 @@ func (bf *BloomFilterStore) CheckAddress(address string) (bool, error) {
 	return bf.filter.Test(addressBytes), nil
 }
 
-// LoadFromFile loads the Bloom filter from the specified file and decrypts it.
 func (bf *BloomFilterStore) LoadFromFile(filePath string) error {
 	if filePath == "" {
 		return fmt.Errorf("no file path specified for loading")
@@ -93,20 +113,31 @@ func (bf *BloomFilterStore) LoadFromFile(filePath string) error {
 
 	f, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %v", err)
+		return fmt.Errorf("failed to open file: %w", err)
 	}
-
-	//TODO: Decrypt the data and validate the integrity of the decrypted data.
-	r := bufio.NewReader(f)
+	defer f.Close()
 
 	var filter bloom.BloomFilter
-	if _, err := filter.ReadFrom(r); err != nil {
-		return fmt.Errorf("failed to read Bloom filter: %v", err)
+	if bf.secureDataHandler != nil {
+		r, err := bf.secureDataHandler.Reader(f)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt file: %w", err)
+		}
+		if _, err := filter.ReadFrom(r); err != nil {
+			return fmt.Errorf("failed to read Bloom filter: %w", err)
+		}
+		if err := r.VerifySignature(); err != nil {
+			return fmt.Errorf("failed to verify signature: %w", err)
+		}
+	} else {
+		r := bufio.NewReader(f)
+		if _, err := filter.ReadFrom(r); err != nil {
+			return fmt.Errorf("failed to read Bloom filter: %w", err)
+		}
 	}
 
 	bf.mu.Lock()
 	defer bf.mu.Unlock()
-
 	bf.filter = &filter
 
 	return nil
@@ -123,6 +154,17 @@ func (bf *BloomFilterStore) SaveToFile(filePath string) error {
 		return fmt.Errorf("failed to create file: %v", err)
 	}
 	defer f.Close()
+
+	if bf.secureDataHandler != nil {
+		w, err := bf.secureDataHandler.Writer(f)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt file: %v", err)
+		}
+		if _, err := bf.filter.WriteTo(w); err != nil {
+			return err
+		}
+		return w.Close()
+	}
 
 	w := bufio.NewWriter(f)
 	if _, err := bf.filter.WriteTo(w); err != nil {

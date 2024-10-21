@@ -13,7 +13,7 @@ import (
 func BenchmarkAddAddress(b *testing.B) {
 	addressHandler := &address.EVMAddressHandler{}
 	count := 100000
-	bf, err := NewBloomFilterStore(uint(count), 0.000001, addressHandler)
+	bf, err := NewBloomFilterStore(addressHandler, WithEstimates(uint(count), 0.000001))
 	if err != nil {
 		b.Fatalf("Failed to create BloomFilterStore: %v", err)
 	}
@@ -59,7 +59,7 @@ func BenchmarkBloomFilterTestNaive(b *testing.B) {
 func BenchmarkCheckAddress(b *testing.B) {
 	addressHandler := &address.EVMAddressHandler{}
 	count := 100000
-	bf, err := NewBloomFilterStore(uint(count), 0.000001, addressHandler)
+	bf, err := NewBloomFilterStore(addressHandler, WithEstimates(uint(count), 0.000001))
 	if err != nil {
 		b.Fatalf("Failed to create BloomFilterStore: %v", err)
 	}

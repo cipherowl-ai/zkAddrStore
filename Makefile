@@ -18,6 +18,8 @@ all: fmt clean build-debug build-release
 fmt:
 	$(GOCMD) fmt ./address
 	$(GOCMD) fmt cmd
+	$(GOCMD) fmt ./reload
+	$(GOCMD) fmt ./securedata
 	$(GOCMD) fmt ./store
 
 

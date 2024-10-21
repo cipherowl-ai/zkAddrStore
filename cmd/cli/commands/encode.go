@@ -32,7 +32,7 @@ func init() {
 
 func runEncode(_ *cobra.Command, _ []string) {
 	addressHandler := &address.EVMAddressHandler{}
-	filter, err := store.NewBloomFilterStore(nFlag, pFlag, addressHandler)
+	filter, err := store.NewBloomFilterStore(addressHandler, store.WithEstimates(nFlag, pFlag))
 	if err != nil {
 		fmt.Println("Error creating Bloom filter:", err)
 		os.Exit(-1)

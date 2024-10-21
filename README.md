@@ -38,8 +38,8 @@ Create a new Bloom filter store and add addresses to it:
 // Create an EVM address handler that will be used to validate and encode addresses
 addressHandler := &address.EVMAddressHandler{}
 
-// Create a new BloomFilterStore to store 100 addresses with a false positive rate of 0.1
-store, _ := NewBloomFilterStore(100, 0.1, addressHandler)
+// Create a new BloomFilterStore to store 10000 addresses with a false positive rate of 0.0000001
+store, _ := NewBloomFilterStore(addressHandler)
 
 store.AddAddress("0x1234567890123456789012345678901234567890")
 
@@ -80,6 +80,18 @@ defer manager.Stop()
 
 ```
 
+### Using pgp encrypted and sign files
+```go
+// Create the pgp secure data handler
+pgpHandler := securedata.NewPGPSecureDataHandler(
+	withPublicKeyPath(publicKeyPath),
+	withPrivateKeyPath(privateKeyPath, passphrase),
+)
+
+// Create a new Bloom filter store from a pgp encrypted file
+addressHandler := &address.EVMAddressHandler{}
+store, _ := NewBloomFilterStoreFromFile(filePath, addressHandler, WithSecureDataHandler(pgpHandler))
+````
 
 ## CLI Usage
 
